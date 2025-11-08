@@ -157,9 +157,12 @@ jobs:
           echo ""
 
       - name: Build SideStore.xcarchive
-        # using 'tee' to intercept stdout and log for detailed build-log
         run: |
-          NSUnbufferedIO=YES make -B build 2>&1 | tee -a build/logs/build.log | xcbeautify --renderer github-actions && exit ${PIPESTATUS[0]}
+          export XCODEBUILD_DESTINATION="generic/platform=iOS"
+          NSUnbufferedIO=YES make -B build DESTINATION="$XCODEBUILD_DESTINATION" 2>&1 \
+            | tee -a build/logs/build.log \
+            | xcbeautify --renderer github-actions
+          exit ${PIPESTATUS[0]}
         shell: bash
 
       - name: Fakesign app
