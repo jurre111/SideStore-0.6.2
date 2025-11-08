@@ -155,6 +155,24 @@ jobs:
           echo ">>>>>>>>> Xcode-Derived-Data <<<<<<<<<<"
           ls -la ~/Library/Developer/Xcode/DerivedData || true  # List contents if directory exists
           echo ""
+      - name: Prepare dependencies (AltSign & OpenSSL)
+        run: |
+          cd SideStore/AltSign
+          if [ -f "setup.sh" ]; then
+            echo "Running AltSign setup..."
+            chmod +x setup.sh
+            ./setup.sh
+          elif [ -f "Makefile" ]; then
+            echo "Running make dependencies..."
+            make dependencies
+          else
+            echo "No setup script found, manually cloning OpenSSL..."
+            mkdir -p Dependencies/OpenSSL/Frameworks
+            git clone https://github.com/rileytestut/OpenSSL.git tmp_openssl
+            cp -R tmp_openssl/Frameworks/OpenSSL.xcframework Dependencies/OpenSSL/Frameworks/
+            rm -rf tmp_openssl
+          fi
+        shell: bash
 
       - name: Build SideStore.xcarchive
         run: |
