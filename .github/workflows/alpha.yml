@@ -1,0 +1,28 @@
+name: Alpha SideStore build
+on:
+  push:
+    branches:
+      - develop-alpha
+
+# cancel duplicate run if from same branch
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  Reusable-build:
+    uses: ./.github/workflows/reusable-sidestore-build.yml
+    with:
+      # bundle_id: "com.SideStore.SideStore.Alpha"
+      bundle_id: "com.SideStore.SideStore"
+      # bundle_id_suffix: ".Alpha"
+      is_beta: true
+      publish: ${{ vars.PUBLISH_ALPHA_UPDATES == 'true' }} 
+      is_shared_build_num: false
+      release_tag: "alpha"
+      release_name: "Alpha"
+      upstream_tag: "nightly"
+      upstream_name: "Nightly"
+    secrets:
+      CROSS_REPO_PUSH_KEY: ${{ secrets.CROSS_REPO_PUSH_KEY }}
+      BUILD_LOG_ZIP_PASSWORD: ${{ secrets.BUILD_LOG_ZIP_PASSWORD }}

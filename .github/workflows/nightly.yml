@@ -1,0 +1,82 @@
+name: Nightly SideStore Build
+on:
+  push:
+    branches:
+      - develop
+  schedule:
+    - cron: '0 0 * * *' # Runs every night at midnight UTC
+  workflow_dispatch: # Allows manual trigger
+
+# cancel duplicate run if from same branch
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check-changes:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    outputs:
+      has_changes: ${{ steps.check.outputs.has_changes }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Ensure full history
+
+      - name: Get last successful workflow run
+        id: get_last_success
+        run: |
+          LAST_SUCCESS=$(gh run list --workflow "Nightly SideStore Build" --json createdAt,conclusion \
+            --jq '[.[] | select(.conclusion=="success")][0].createdAt' || echo "")
+          echo "Last successful run: $LAST_SUCCESS"
+          echo "last_success=$LAST_SUCCESS" >> $GITHUB_ENV
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check for new commits since last successful build
+        id: check
+        run: |
+          if [ -n "$LAST_SUCCESS" ]; then
+            NEW_COMMITS=$(git rev-list --count --since="$LAST_SUCCESS" origin/develop)
+            COMMIT_LOG=$(git log --since="$LAST_SUCCESS" --pretty=format:"%h %s" origin/develop)
+          else
+            NEW_COMMITS=1
+            COMMIT_LOG=$(git log -n 10 --pretty=format:"%h %s" origin/develop) # Show last 10 commits if no history
+          fi
+          
+          echo "Has changes: $NEW_COMMITS"
+          echo "New commits since last successful build:"
+          echo "$COMMIT_LOG"
+          
+          if [ "$NEW_COMMITS" -gt 0 ]; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LAST_SUCCESS: ${{ env.last_success }}
+
+  Reusable-build:
+    if: |
+      always() &&
+      (github.event_name == 'push' || 
+      (github.event_name == 'schedule' && needs.check-changes.result == 'success' && needs.check-changes.outputs.has_changes == 'true'))
+    needs: check-changes
+    uses: ./.github/workflows/reusable-sidestore-build.yml
+    with:
+      # bundle_id: "com.SideStore.SideStore.Nightly"
+      bundle_id: "com.SideStore.SideStore"
+      # bundle_id_suffix: ".Nightly"
+      is_beta: true
+      publish: ${{ vars.PUBLISH_NIGHTLY_UPDATES == 'true' }} 
+      is_shared_build_num: false
+      release_tag: "nightly"
+      release_name: "Nightly"
+      upstream_tag: "0.5.10"
+      upstream_name: "Stable"
+    secrets:
+      CROSS_REPO_PUSH_KEY: ${{ secrets.CROSS_REPO_PUSH_KEY }}
+      BUILD_LOG_ZIP_PASSWORD: ${{ secrets.BUILD_LOG_ZIP_PASSWORD }}
+
